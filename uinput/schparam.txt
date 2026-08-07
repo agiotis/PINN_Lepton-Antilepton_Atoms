@@ -1,0 +1,5 @@
+Particles_System     :Muonium
+Reduced_mass         :0.5085394843748721
+Bohr_Radius          :53173.64872567013
+Prim._Quant._numb.   :1
+Azimuth._Quant._numb.:0

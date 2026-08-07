@@ -1,0 +1,9 @@
+Particles_System     :Positronium
+Positronium_mass1         :0.51099895
+Positronium_rest_mass         :0.255499475
+Fine Structure Const :0.0072973525693
+Coupling Constant :0.0072973525693
+Prim._Quant._numb.   :1
+Azimuth._Quant._numb.    :0
+total_angular_momentum    :1
+k_operator    :None

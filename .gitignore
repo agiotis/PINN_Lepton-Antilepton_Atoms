@@ -1,0 +1,49 @@
+﻿__pycache__/
+*.py[cod]
+.pytest_cache/
+.ipynb_checkpoints/
+
+# Local environments
+.venv/
+venv/
+.env/
+
+# Generated numerical outputs and experiment artifacts
+data/
+ablation_experiment/
+class_diagram/
+
+# Local minimizer/cache artifacts
+*.pkl
+minimizer_params*.pkl
+
+# Local validation/release working folders
+*_release_validation/
+dirac_stage*/
+dirac_release*/
+*.zip
+
+# Runtime/log files
+*.out
+*.err
+nohup.out
+
+# Manuscript / pre-proof / paper files are not part of the public code release
+papers/
+*.pdf
+pre-proof-paper.pdf
+Gkrepis_2024_J._Phys.__Conf._Ser._2701_012133.pdf
+
+# IDE/editor local settings
+.idea/
+.vscode/
+
+# Manuscript / paper / pre-proof files are not part of the public code release
+papers/
+*.pdf
+*.tex
+pre-proof-paper.pdf
+Gkrepis_2024_J._Phys.__Conf._Ser._2701_012133.pdf
+
+# Accidental placeholder files
+None

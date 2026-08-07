@@ -1,0 +1,8 @@
+Particles_System     :Muonium
+Electron_rest_mass         :0.5085394843748721
+Fine Structure Const :0.0072973525693
+Prim._Quant._numb.   :1
+Azimuth._Quant._numb.    :0
+total_angular_momentum    :1
+k_operator    :None
+dirac_coefficient_mode    :fixed
