@@ -201,9 +201,21 @@ The examples above are intended to provide practical entry points for reproducin
 
 If you use this code, please cite:
 
-**A Physics-Informed Neural Network Framework for Solving Schrödinger and Dirac Equations in Lepton-Antilepton Bound States**, Computer Physics Communications, 2026.  
-https://doi.org/10.1016/j.cpc.2026.110335
+```bibtex
+@article{GIOTIS2026110335,
+  title   = {A unified Python framework for solving Schr{\"o}dinger and Dirac equations in exotic lepton--antilepton atoms},
+  journal = {Computer Physics Communications},
+  volume  = {328},
+  pages   = {110335},
+  year    = {2026},
+  issn    = {0010-4655},
+  doi     = {10.1016/j.cpc.2026.110335},
+  url     = {https://www.sciencedirect.com/science/article/pii/S0010465526003176},
+  author  = {Giotis, Angelos P. and Gkrepis, Athanasios and Kosmas, Odysseas and Kosmas, Theocharis S.}
+}
+```
 
 ## License
 
 This repository is distributed under the Creative Commons Attribution-NonCommercial 4.0 International License (CC BY-NC 4.0). See `LICENSE` for details.
+
