@@ -139,7 +139,7 @@ When prompted, enter:
 
 ## Dirac equation examples
 
-The following examples use random initialization and learnable F/G component coefficients. Dirac runs require an explicit `--dirac-coefficient-mode`. These are supported single-run commands; convergence depends on the initialization and numerical configuration.
+The following examples use random initialization and fixed F/G component coefficients (c_f = c_g = 1). Both fixed and learnable coefficient modes are supported.
 
 ### Dirac ground state, n=1, l=0
 
@@ -153,7 +153,7 @@ python .\main.py `
   --optimization_method L-BFGS-B `
   --activation_function tanh `
   --u0_init_method random `
-  --dirac-coefficient-mode learnable `
+  --dirac-coefficient-mode fixed `
   --overlay_plot
 ```
 
@@ -175,7 +175,7 @@ python .\main.py `
   --optimization_method L-BFGS-B `
   --activation_function tanh `
   --u0_init_method random `
-  --dirac-coefficient-mode learnable `
+  --dirac-coefficient-mode fixed `
   --overlay_plot
 ```
 
