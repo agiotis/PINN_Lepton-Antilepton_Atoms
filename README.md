@@ -85,7 +85,7 @@ For Schrödinger runs, the five binary entries select **H1, H2, H3, H4 and H5**,
 
 ### Implementation updates
 
-This maintenance release corrects correction-mask parsing, reduced radial operators for `U(r) = r R(r)`, higher-order trial-function and activation derivatives, and H1–H5 physical prefactors and angular/contact contributions. These changes make the selected correction operators act consistently on the trial function within the existing Schrödinger formulation.
+This maintenance release includes refinements to correction-mask parsing, reduced radial operators for `U(r) = r R(r)`, higher-order trial-function and activation derivatives, and the implementation of H1–H5 correction terms. These changes make the selected correction operators act consistently on the trial function within the existing Schrödinger formulation.
 
 The public entrypoint no longer requires private batch modules. Explicitly supplied Schrödinger minimization tolerances are passed to the selected SciPy optimizer. These refinements preserve the existing solver architecture and reference-energy evaluation.
 
