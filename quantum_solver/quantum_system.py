@@ -19,6 +19,33 @@ from .dirac_canonical_adapter import DiracStateMetadata, ShadowDiracAdapter
 fundamental_values = FundamentalValues()
 
 
+def normalize_hamiltonian_correction_terms(mask):
+    if isinstance(mask, str):
+        if not mask.strip():
+            raise ValueError("Hamiltonian correction-term mask must not be empty.")
+        values = mask.split()
+    elif isinstance(mask, (list, tuple)):
+        values = list(mask)
+    else:
+        raise ValueError("Hamiltonian correction-term mask must be a spaced string, list, or tuple.")
+
+    if len(values) != 5:
+        raise ValueError("Hamiltonian correction-term mask must contain exactly five entries.")
+
+    normalized = []
+    for value in values:
+        if isinstance(value, str):
+            if value not in ("0", "1"):
+                raise ValueError("Hamiltonian correction-term mask entries must be 0 or 1.")
+            normalized.append(int(value))
+        elif isinstance(value, int) and value in (0, 1):
+            normalized.append(value)
+        else:
+            raise ValueError("Hamiltonian correction-term mask entries must be 0 or 1.")
+
+    return normalized
+
+
 def save_minimizer(ures, filename="minimizer_params.pkl"):
     """Αποθηκεύει το minimizer (parameters) σε αρχείο."""
     with open(filename, 'wb') as f:
@@ -147,7 +174,10 @@ class Particle(QuantumSystem):
         super().__init__(hyperparameters, system_index)
         self.save_parameters(hyperparameters)
         self.normalization_constant = None  # Initialize as None the norm_constant squared
-        self.breit = hyperparameters['hamiltonian_correction_terms']
+        self.breit = normalize_hamiltonian_correction_terms(hyperparameters['hamiltonian_correction_terms'])
+        if (hyperparameters['diff_equation'] == 'Schrodinger'
+                and hyperparameters.get('minimization_tol_explicit', 'minimization_tol_lvl' in hyperparameters)):
+            self.tolerance_level = hyperparameters.get('minimization_tol_lvl')
 
     def save_initial_point_u0(self, u0):
         directory = f'./data/{self.particle}-Sch/'
@@ -185,26 +215,23 @@ class Particle(QuantumSystem):
     """Breit Part (reduced and non-reduced)"""
 
     def radnablsq(self, u: list, r: float) -> float:
-        """Radial Part of Nabla Squared"""
+        """Reduced radial Laplacian A_l U = U'' - l(l+1) U/r^2."""
         term1 = NeuralNetwork.secderarfunc(r, u, self.k_optimization_const, self.num_hidden_units, self.activation)
-        term2 = NeuralNetwork.firderarfunc(r, u, self.k_optimization_const, self.num_hidden_units, self.activation)
-        term3 = (- self.azimuthal_quant_num * (self.azimuthal_quant_num + 1) /
-                 np.power(r, 2) * NeuralNetwork.arfunc(r, u, self.k_optimization_const,
-                                                       self.num_hidden_units, self.activation))
-        return term1 + 2 / r * term2 + term3
+        term2 = (- self.azimuthal_quant_num * (self.azimuthal_quant_num + 1) / r ** 2
+                 * NeuralNetwork.arfunc(r, u, self.k_optimization_const, self.num_hidden_units, self.activation))
+        return term1 + term2
 
     def radnablfo(self, u: list, r: float) -> float:
-        """Radial Part of Nabla Fourth"""
+        """Squared reduced radial Laplacian A_l^2 acting on U = r R."""
+        angular = self.azimuthal_quant_num * (self.azimuthal_quant_num + 1)
         term1 = NeuralNetwork.fourderarfunc(r, u, self.k_optimization_const, self.num_hidden_units, self.activation)
-        term2 = 4 / r * NeuralNetwork.thirderarfunc(r, u, self.k_optimization_const,
-                                                    self.num_hidden_units, self.activation)
-        term3 = (- self.azimuthal_quant_num * (self.azimuthal_quant_num + 1) / np.power(r, 2)
+        term2 = (-2 * angular / r ** 2
                  * NeuralNetwork.secderarfunc(r, u, self.k_optimization_const, self.num_hidden_units, self.activation))
-        term4 = (- 2 * self.azimuthal_quant_num * (self.azimuthal_quant_num + 1) / np.power(r, 3)
+        term3 = (4 * angular / r ** 3
+                 * NeuralNetwork.firderarfunc(r, u, self.k_optimization_const, self.num_hidden_units, self.activation))
+        term4 = (angular * (angular - 6) / r ** 4
                  * NeuralNetwork.arfunc(r, u, self.k_optimization_const, self.num_hidden_units, self.activation))
-        term5 = (self.azimuthal_quant_num * (self.azimuthal_quant_num + 1) *
-                 (np.power(self.azimuthal_quant_num, 2) + self.azimuthal_quant_num - 2) / np.power(r, 4))
-        return term1 + term2 + term3 + term4 + term5
+        return term1 + term2 + term3 + term4
 
     @staticmethod
     def deltafunc(c: float, r: float) -> float:
@@ -214,62 +241,77 @@ class Particle(QuantumSystem):
         return term1 * term2
 
     def breitcoef(self, r: float, u: list, v: list) -> float:
-        """Breit terms that enter the Hamiltonian"""
+        """Apply only selected Breit corrections to the reduced radial trial function."""
+        if not any(v):
+            return 0.0
         cterm = 10 / self.alpha0
+        correction = 0.0
 
-        # Relativistic kinetic energy Η1
-        breit1 = ((-np.power(fundamental_values.hbarc, 4) / (8 * np.power(cterm, 6))
-                   * (np.power(self.mass1, -3) + np.power(self.mass2, -3))) * self.radnablfo(u, r))
+        if v[0]:
+            # Relativistic kinetic energy Η1
+            breit1 = ((-np.power(fundamental_values.hbarc, 4) / 8
+                       * (np.power(self.mass1, -3) + np.power(self.mass2, -3))) * self.radnablfo(u, r))
+            correction += breit1
 
-        # Retarded potentials Η2
-        breit2 = (np.power(fundamental_values.e_charge, 2) * np.power(fundamental_values.hbarc, 2) /
-                  (2 * self.mass1 * self.mass2 * np.power(cterm, 4) * r)
-                  * (self.radnablsq(u, r) + NeuralNetwork.secderarfunc(r, u, self.k_optimization_const,
-                                                                       self.num_hidden_units, self.activation)))
+        if v[1]:
+            # Retarded potentials Η2
+            breit2 = (fundamental_values.e_charge * np.power(fundamental_values.hbarc, 2) /
+                      (2 * self.mass1 * self.mass2 * r)
+                      * (2 * NeuralNetwork.secderarfunc(r, u, self.k_optimization_const,
+                                                             self.num_hidden_units, self.activation)
+                          - 2 / r * NeuralNetwork.firderarfunc(r, u, self.k_optimization_const,
+                                                             self.num_hidden_units, self.activation)
+                          + (2 - self.azimuthal_quant_num * (self.azimuthal_quant_num + 1)) / r ** 2
+                          * NeuralNetwork.arfunc(r, u, self.k_optimization_const,
+                                                 self.num_hidden_units, self.activation)))
+            correction += breit2
 
-        # Spin-Orbit coupling Η3
-        if self.mass1 == self.mass2:
-            breit3 = (3 * np.power(fundamental_values.e_charge, 2) * np.power(fundamental_values.hbarc, 2) /
-                      (4 * np.power(self.mass1, 2) * np.power(cterm, 4) * np.power(r, 3))
-                      * (self.total_angular_momentum * (self.total_angular_momentum + 1) -
-                         self.azimuthal_quant_num * (self.azimuthal_quant_num + 1) -
-                         self.total_spin_momentum * (self.total_spin_momentum + 1)))  # case m1 = m2
-        else:
-            term1 = (self.total_angular_momentum * (self.total_angular_momentum + 1) -
-                     self.azimuthal_quant_num * (self.azimuthal_quant_num + 1) -
-                     self.total_spin_momentum * (self.total_spin_momentum + 1)) / (self.mass1 * self.mass2)  # j-l-s
-            term2 = ((self.angular_momentum1 * (self.angular_momentum1 + 1) -
-                      self.azimuthal_quant_num * (self.azimuthal_quant_num + 1) - 3 / 4) /
-                     (2 * np.power(self.mass1, 2)))  # j1-l-s
-            term3 = ((self.angular_momentum2 * (self.angular_momentum2 + 1) -
-                      self.azimuthal_quant_num * (self.azimuthal_quant_num + 1) - 3 / 4) /
-                     (2 * np.power(self.mass2, 2)))  # j2-l-s
-            breit3 = (np.power(fundamental_values.e_charge, 2) * np.power(fundamental_values.hbarc, 2) /
-                      (2 * np.power(cterm, 4) * np.power(r, 3)) * (term1 + term2 + term3))  # case m1 != m2
-        # Darwin term Η4
-        breit4 = ((np.pi * np.power(fundamental_values.e_charge, 2) * np.power(fundamental_values.hbarc, 2) /
-                   (2 * np.power(cterm, 4))) * (np.power(self.mass1, -2) + np.power(self.mass2, -2))
-                  * self.deltafunc(cterm, r))
+        if v[2]:
+            # Spin-Orbit coupling Η3
+            chi = (self.total_angular_momentum * (self.total_angular_momentum + 1)
+                   - self.azimuthal_quant_num * (self.azimuthal_quant_num + 1)
+                   - self.total_spin_momentum * (self.total_spin_momentum + 1))
+            if self.mass1 == self.mass2:
+                breit3 = (3 * fundamental_values.e_charge * np.power(fundamental_values.hbarc, 2) /
+                          (4 * np.power(self.mass1, 2) * np.power(r, 3)) * chi)  # case m1 = m2
+            else:
+                # Diagonal triplet LSJ: <L.s1> = <L.s2> = chi/4.
+                term1 = chi / (self.mass1 * self.mass2)
+                term2 = chi / (4 * np.power(self.mass1, 2))
+                term3 = chi / (4 * np.power(self.mass2, 2))
+                breit3 = (fundamental_values.e_charge * np.power(fundamental_values.hbarc, 2) /
+                          (2 * np.power(r, 3)) * (term1 + term2 + term3))  # case m1 != m2
+            correction += breit3 * NeuralNetwork.arfunc(
+                r, u, self.k_optimization_const, self.num_hidden_units, self.activation)
 
-        # Spin-Spin  Η5
-        slterm = ((self.total_angular_momentum * (self.total_angular_momentum + 1)
-                   - self.azimuthal_quant_num * (self.azimuthal_quant_num + 1))
-                  - self.total_angular_momentum * (self.azimuthal_quant_num + 1))  # j( j+1) - l(l+1) - s(s+1):
-        breit51 = - 4 * np.pi / 3 * (self.total_spin_momentum *
-                                     (self.total_spin_momentum + 1) - 3 / 2) * self.deltafunc(cterm, r)
-        breit520 = ((self.azimuthal_quant_num * self.total_spin_momentum *
-                     (self.azimuthal_quant_num + 1) * (self.total_spin_momentum + 1)) -
-                    3 / 4 * (slterm + np.power(slterm, 2)))  # ls(l+1)(s+1) - 3/4 (SL^2 + SL)
-        breit52 = (-1 / ((2 * self.azimuthal_quant_num + 3) * (2 * self.azimuthal_quant_num - 1) * np.power(r, 3))
-                   * breit520)
-        breit5 = (- np.power(fundamental_values.e_charge, 2) * np.power(fundamental_values.hbarc, 2) /
-                  (self.mass1 * self.mass2 * np.power(cterm, 4)) * (breit51 + breit52))
+        if v[3]:
+            # Darwin term Η4
+            # The unchanged global kernel has full-space integral 2*pi.
+            delta_normalized = self.deltafunc(cterm, r) / (2 * np.pi)
+            breit4 = ((np.pi * fundamental_values.e_charge * np.power(fundamental_values.hbarc, 2) / 2)
+                      * (np.power(self.mass1, -2) + np.power(self.mass2, -2)) * delta_normalized)
+            correction += breit4 * NeuralNetwork.arfunc(
+                r, u, self.k_optimization_const, self.num_hidden_units, self.activation)
 
-        # Ensure all elements in v are valid numerical values
-        v_numeric = [float(val) if val.strip() != '' else 0.0 for val in v]
-        # print(f'Breit choices: {v_numeric}', end='\r')
-        return (breit1 * v_numeric[0] + breit2 * v_numeric[1] + breit3 * v_numeric[2] + breit4 * v_numeric[3] +
-                breit5 * v_numeric[4])
+        if v[4]:
+            # Spin-Spin  Η5
+            delta_normalized = self.deltafunc(cterm, r) / (2 * np.pi)
+            slterm = ((self.total_angular_momentum * (self.total_angular_momentum + 1)
+                       - self.azimuthal_quant_num * (self.azimuthal_quant_num + 1))
+                      - self.total_spin_momentum * (self.total_spin_momentum + 1))  # chi = 2<L.S>
+            breit51 = - 4 * np.pi / 3 * (self.total_spin_momentum *
+                                         (self.total_spin_momentum + 1) - 3 / 2) * delta_normalized
+            breit520 = ((self.azimuthal_quant_num * self.total_spin_momentum *
+                         (self.azimuthal_quant_num + 1) * (self.total_spin_momentum + 1)) -
+                        3 / 4 * (slterm + np.power(slterm, 2)))  # ls(l+1)(s+1) - 3/4 (SL^2 + SL)
+            breit52 = (-1 / ((2 * self.azimuthal_quant_num + 3) * (2 * self.azimuthal_quant_num - 1) * np.power(r, 3))
+                       * breit520)
+            breit5 = (- fundamental_values.e_charge * np.power(fundamental_values.hbarc, 2) /
+                      (self.mass1 * self.mass2) * (breit51 + breit52))
+            correction += breit5 * NeuralNetwork.arfunc(
+                r, u, self.k_optimization_const, self.num_hidden_units, self.activation)
+
+        return correction
 
     def objective_function(self, u: list, r0: list) -> float:
         """Error function (with/without Breit terms)"""

@@ -7,7 +7,6 @@ from quantum_solver import dirac_canonical as dc
 from quantum_solver.dirac_canonical_adapter import ShadowDiracAdapter
 from quantum_solver.quantum_system import Electron
 from quantum_solver.plotting import DiracPlotter
-from ablation_experiment import batch_dirac
 
 def hyper(mode='learnable',h=2):
  return {'diff_equation':'Dirac','arguments.parent_equation':'Schrodinger','hamiltonian_correction_terms':'0 0 0 0 0','num_of_hidden_units':h,'num_of_equidistant_points':7,'fuc':1,'optimization_method':'BFGS','minimization_tol_lvl':1e-8,'primary_quantum_number':1,'azimuthal_quantum_number':0,'total_angular_momentum':0.5,'k_operator':-1,'coupling_constant':dc.FINE_STRUCTURE_CONSTANT,'two_body_system':'combined_hamiltonian','k_optimization_constant':0.16,'u0_init_method':'fixed','activation_function':'tanh','user_search_grid':0,'overlay_plot':False,'input_file':True,'verbose':False,'experiment_index':99,'mass_relation':'m1>>m2','subsystem':'Muonium','numerical_method':'NeuralNetworks','manual_u0':None,'dirac_coefficient_mode':mode}
@@ -25,7 +24,14 @@ class RuntimeWiringTests(unittest.TestCase):
   with self.assertRaisesRegex(ValueError,'learnable.*fixed'): main.validate_dirac_coefficient_mode(self.ns(mode='auto'))
  def test_05_schrodinger_does_not_require_mode(self): self.assertIsNone(main.validate_dirac_coefficient_mode(self.ns(diff='Schrodinger',mode=None)))
  def test_06_mode_survives_config_creation(self): self.assertEqual(electron('fixed').dirac_coefficient_mode,dc.FIXED_UNIT_COEFFICIENTS)
- def test_07_mode_survives_batch_argument_propagation(self): self.assertIn('fixed',batch_dirac.build_dirac_command('python','main.py',2,'fixed'))
+ def test_07_mode_survives_batch_argument_propagation(self):
+  try:
+   import ablation_experiment.batch_dirac as batch_dirac
+  except ModuleNotFoundError as error:
+   if error.name not in ('ablation_experiment', 'ablation_experiment.batch_dirac'):
+    raise
+   self.skipTest('Optional private ablation_experiment.batch_dirac module is not available.')
+  self.assertIn('fixed',batch_dirac.build_dirac_command('python','main.py',2,'fixed'))
  def test_08_learnable_vector_layout_h2_h6_h17(self):
   for h in (2,6,17): self.assertEqual(dc.branch_layout(h,dc.LEARNABLE_COEFFICIENTS).expected_length,6*h+2)
  def test_09_fixed_vector_layout_h2_h6_h17(self):

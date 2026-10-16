@@ -109,17 +109,13 @@ class NeuralNetwork:
     def thirdersigmoid(s: float) -> float:
         """Third derivative of the sigmoid function."""
         sig = NeuralNetwork.sigmoid(s)
-        sig1 = 1 - sig
-        sig2 = 1 - 2 * sig
-        return sig * sig1 * (sig1 - 3 * sig * sig2)
+        return sig * (1 - sig) * (1 - 6 * sig + 6 * sig ** 2)
 
     @staticmethod
     def fourdersigmoid(s: float) -> float:
         """Fourth derivative of the sigmoid function."""
         sig = NeuralNetwork.sigmoid(s)
-        sig1 = 1 - sig
-        sig2 = 1 - 2 * sig
-        return sig * sig1 * (sig1 * (sig1 - 6 * sig * sig2) + 3 * sig * sig * (2 - sig))
+        return sig * (1 - sig) * (1 - 14 * sig + 36 * sig ** 2 - 24 * sig ** 3)
 
     # Original changed in 19/12/2025
     # @staticmethod
@@ -223,20 +219,15 @@ class NeuralNetwork:
 
     @staticmethod
     def thirdertanh(s: float) -> float:
-        """Third Derivative of Hyperbolic Tangent"""
+        """Third derivative of the hyperbolic tangent."""
         tanh_val = np.tanh(s)
-        tanh_squared = tanh_val ** 2
-        one_minus_tanh_squared = 1 - tanh_squared
-        return 2 * tanh_val * (3 * tanh_squared - 1) * one_minus_tanh_squared
+        return 2 * (1 - tanh_val ** 2) * (3 * tanh_val ** 2 - 1)
 
     @staticmethod
     def fourdertanh(s: float) -> float:
-        """Fourth Derivative of Hyperbolic Tangent"""
+        """Fourth derivative of the hyperbolic tangent."""
         tanh_val = np.tanh(s)
-        tanh_squared = tanh_val ** 2
-        one_minus_tanh_squared = 1 - tanh_squared
-        tanh_fourth = tanh_squared ** 2
-        return 2 * one_minus_tanh_squared * (1 - 6 * tanh_squared + 6 * tanh_fourth)
+        return 8 * tanh_val * (1 - tanh_val ** 2) * (2 - 3 * tanh_val ** 2)
 
     @staticmethod
     def activfunc(act_function, deg: int) -> callable:
@@ -398,101 +389,31 @@ class NeuralNetwork:
 
     @staticmethod
     def thirderarfunc(r: float, u: list, kpam: float, ite: int, act_function) -> float:
-        """Third derivative of the numerical solution"""
-        thir11p = (np.exp(-kpam * r) *
-                   NeuralNetwork.secderneuralfunc(r, u, NeuralNetwork.activfunc(act_function, 2), ite))
-        thir12p = -kpam * r * NeuralNetwork.secderneuralfunc(r, u, NeuralNetwork.activfunc(act_function, 2), ite)
-        thir13p = (r * np.exp(-kpam * r) *
-                   NeuralNetwork.thirderneuralfunc(r, u, NeuralNetwork.activfunc(act_function, 3), ite))
-        thir21p = ((- 2 * kpam * np.exp(-kpam * r) *
-                    NeuralNetwork.firderneuralfunc(r, u, NeuralNetwork.activfunc(act_function, 1), ite)) *
-                   (1 - kpam * r))
-        thir22p = (2 * np.exp(-kpam * r) *
-                   NeuralNetwork.secderneuralfunc(r, u, NeuralNetwork.activfunc(act_function, 2), ite)
-                   * (1 - kpam * r))
-        thir23p = (- 2 * kpam * np.exp(-kpam * r) *
-                   NeuralNetwork.firderneuralfunc(r, u, NeuralNetwork.activfunc(act_function, 1), ite))
-        thir31p = (- np.power(kpam, 2) * np.exp(-kpam * r) *
-                   NeuralNetwork.neuralfunc(r, u, NeuralNetwork.activfunc(act_function, 0), ite) * (kpam * r - 2))
-        thir32p = (kpam * np.exp(-kpam * r) *
-                   NeuralNetwork.firderneuralfunc(r, u, NeuralNetwork.activfunc(act_function, 1), ite) * (kpam * r - 2))
-        thir33p = (np.power(kpam, 2) * np.exp(-kpam * r) *
-                   NeuralNetwork.neuralfunc(r, u, NeuralNetwork.activfunc(act_function, 0), ite))
-        return thir11p + thir12p + thir13p + thir21p + thir22p + thir23p + thir31p + thir32p + thir33p
+        """Third derivative of U(r) = r exp(-kpam r) N(r)."""
+        n0 = NeuralNetwork.neuralfunc(r, u, NeuralNetwork.activfunc(act_function, 0), ite)
+        n1 = NeuralNetwork.firderneuralfunc(r, u, NeuralNetwork.activfunc(act_function, 1), ite)
+        n2 = NeuralNetwork.secderneuralfunc(r, u, NeuralNetwork.activfunc(act_function, 2), ite)
+        n3 = NeuralNetwork.thirderneuralfunc(r, u, NeuralNetwork.activfunc(act_function, 3), ite)
+        return np.exp(-kpam * r) * (
+            r * n3 + (3 - 3 * kpam * r) * n2
+            + (3 * kpam ** 2 * r - 6 * kpam) * n1
+            + (3 * kpam ** 2 - kpam ** 3 * r) * n0
+        )
 
     @staticmethod
     def fourderarfunc(r: float, u: list, kpam: float, ite: int, act_function) -> float:
-        """Fourth derivative of the numerical solution"""
-        fourderarfunc0 = 0
-        # thir11p derivative
-        four11p = (- kpam * np.exp(-kpam * r) *
-                   NeuralNetwork.secderneuralfunc(r, u, NeuralNetwork.activfunc(act_function, 2), ite))
-        four12p = (np.exp(-kpam * r) *
-                   NeuralNetwork.thirderneuralfunc(r, u, NeuralNetwork.activfunc(act_function, 3), ite))
-        fourderarfunc0 += four11p + four12p
-        # thir12p derivative
-        four21p = -kpam * NeuralNetwork.secderneuralfunc(r, u, NeuralNetwork.activfunc(act_function, 2), ite)
-        four22p = -kpam * r * NeuralNetwork.thirderneuralfunc(r, u, NeuralNetwork.activfunc(act_function, 3), ite)
-        fourderarfunc0 += four21p + four22p
-        # thir13p derivative
-        four31p = (np.exp(-kpam * r) *
-                   NeuralNetwork.thirderneuralfunc(r, u, NeuralNetwork.activfunc(act_function, 3), ite))
-        four32p = (-kpam * r * np.exp(-kpam * r) *
-                   NeuralNetwork.thirderneuralfunc(r, u, NeuralNetwork.activfunc(act_function, 3), ite))
-        four33p = (r * np.exp(-kpam * r) *
-                   NeuralNetwork.fourderneuralfunc(r, u, NeuralNetwork.activfunc(act_function, 3), ite))
-        fourderarfunc0 += four31p + four32p + four33p
-        # thir21p derivative
-        four41p = ((2 * np.power(kpam, 2) * np.exp(-kpam * r) *
-                    NeuralNetwork.firderneuralfunc(r, u, NeuralNetwork.activfunc(act_function, 1), ite)) *
-                   (1 - kpam * r))
-        four42p = ((- 2 * kpam * np.exp(-kpam * r) *
-                    NeuralNetwork.secderneuralfunc(r, u, NeuralNetwork.activfunc(act_function, 2), ite)) *
-                   (1 - kpam * r))
-        four43p = ((2 * np.power(kpam, 2) * np.exp(-kpam * r) *
-                    NeuralNetwork.firderneuralfunc(r, u, NeuralNetwork.activfunc(act_function, 1), ite)))
-        fourderarfunc0 += four41p + four42p + four43p
-        # thir22p derivative
-        four51p = (-2 * kpam * np.exp(-kpam * r) *
-                   NeuralNetwork.secderneuralfunc(r, u, NeuralNetwork.activfunc(act_function, 2), ite)
-                   * (1 - kpam * r))
-        four52p = (2 * np.exp(-kpam * r) *
-                   NeuralNetwork.thirderneuralfunc(r, u, NeuralNetwork.activfunc(act_function, 3), ite)
-                   * (1 - kpam * r))
-        four53p = (- 2 * kpam * np.exp(-kpam * r) *
-                   NeuralNetwork.secderneuralfunc(r, u, NeuralNetwork.activfunc(act_function, 2), ite))
-        fourderarfunc0 += four51p + four52p + four53p
-        # thir23p derivative
-        four61p = (2 * np.power(kpam, 2) * np.exp(-kpam * r) *
-                   NeuralNetwork.firderneuralfunc(r, u, NeuralNetwork.activfunc(act_function, 1), ite))
-        four62p = (- 2 * kpam * np.exp(-kpam * r) *
-                   NeuralNetwork.secderneuralfunc(r, u, NeuralNetwork.activfunc(act_function, 2), ite))
-        fourderarfunc0 += four61p + four62p
-        # thir31p derivative
-        four71p = (np.power(kpam, 3) * np.exp(-kpam * r) *
-                   NeuralNetwork.neuralfunc(r, u, NeuralNetwork.activfunc(act_function, 0), ite) * (kpam * r - 2))
-        four72p = (- np.power(kpam, 2) * np.exp(-kpam * r) *
-                   NeuralNetwork.firderneuralfunc(r, u, NeuralNetwork.activfunc(act_function, 1), ite) * (kpam * r - 2))
-        four73p = (- np.power(kpam, 3) * np.exp(-kpam * r) *
-                   NeuralNetwork.neuralfunc(r, u, NeuralNetwork.activfunc(act_function, 0), ite))
-        fourderarfunc0 += four71p + four72p + four73p
-        # thir32p derivative
-        four81p = (-np.power(kpam, 2) * np.exp(-kpam * r) *
-                   NeuralNetwork.firderneuralfunc(r, u, NeuralNetwork.activfunc(act_function, 1), ite) * (kpam * r - 2))
-        four82p = (kpam * np.exp(-kpam * r) *
-                   NeuralNetwork.secderneuralfunc(r, u, NeuralNetwork.activfunc(act_function, 2), ite) * (kpam * r - 2))
-        four83p = (np.power(kpam, 2) * np.exp(-kpam * r) *
-                   NeuralNetwork.firderneuralfunc(r, u, NeuralNetwork.activfunc(act_function, 1), ite))
-        fourderarfunc0 += four81p + four82p + four83p
-        # thir33p derivative
-        four91p = (np.power(kpam, 2) * np.exp(-kpam * r) *
-                   NeuralNetwork.neuralfunc(r, u, NeuralNetwork.activfunc(act_function, 0), ite))
-        four92p = (np.power(kpam, 2) * np.exp(-kpam * r) *
-                   NeuralNetwork.neuralfunc(r, u, NeuralNetwork.activfunc(act_function, 0), ite))
-        four93p = (np.power(kpam, 2) * np.exp(-kpam * r) *
-                   NeuralNetwork.neuralfunc(r, u, NeuralNetwork.activfunc(act_function, 0), ite))
-        fourderarfunc0 += four91p + four92p + four93p
-        return fourderarfunc0
+        """Fourth derivative of U(r) = r exp(-kpam r) N(r)."""
+        n0 = NeuralNetwork.neuralfunc(r, u, NeuralNetwork.activfunc(act_function, 0), ite)
+        n1 = NeuralNetwork.firderneuralfunc(r, u, NeuralNetwork.activfunc(act_function, 1), ite)
+        n2 = NeuralNetwork.secderneuralfunc(r, u, NeuralNetwork.activfunc(act_function, 2), ite)
+        n3 = NeuralNetwork.thirderneuralfunc(r, u, NeuralNetwork.activfunc(act_function, 3), ite)
+        n4 = NeuralNetwork.fourderneuralfunc(r, u, NeuralNetwork.activfunc(act_function, 4), ite)
+        return np.exp(-kpam * r) * (
+            r * n4 + (4 - 4 * kpam * r) * n3
+            + (6 * kpam ** 2 * r - 12 * kpam) * n2
+            + (12 * kpam ** 2 - 4 * kpam ** 3 * r) * n1
+            + (kpam ** 4 * r - 4 * kpam ** 3) * n0
+        )
 
     @staticmethod
     def random_initial_value_u0(num_of_hidden_units, f_g_model):

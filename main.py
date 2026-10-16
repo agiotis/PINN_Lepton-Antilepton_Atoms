@@ -10,17 +10,30 @@
 # from quantum_solver.main_solver import MainSolver
 # from quantum_solver.quantum_utils import Schrodinger, Dirac
 import argparse
+from itertools import product
 import numpy as np
 import re
 from quantum_solver.quantum_system import Particle, Electron, Positronium
 from quantum_solver.main_solver import MainSolver
 from quantum_solver.quantum_utils import Schrodinger, Dirac, TwoBodyDiracCoulomb, KleinGordon, Dynamic
 
-from ablation_experiment.batch_schrodinger import generate_breit_terms_combinations
 from quantum_solver.fundamental_values import FundamentalValues
 from quantum_solver import dirac_canonical
 
 FV = FundamentalValues()
+
+
+class StoreExplicitTolerance(argparse.Action):
+    """Record an explicit tolerance without changing the existing CLI default."""
+
+    def __call__(self, parser, namespace, values, option_string=None):
+        setattr(namespace, self.dest, values)
+        namespace._minimization_tol_explicit = True
+
+
+def generate_breit_terms_combinations():
+    """Return the 32 five-entry string tuples in the existing CLI order."""
+    return list(product(('0', '1'), repeat=5))
 
 
 def normalize_dirac_coefficient_mode(value):
@@ -87,6 +100,7 @@ def main(arguments):
         'fuc': arguments.fuc,
         'optimization_method': arguments.optimization_method,
         'minimization_tol_lvl': arguments.minimization_tol_lvl,
+        'minimization_tol_explicit': getattr(arguments, '_minimization_tol_explicit', True),
         'primary_quantum_number': None,
         'azimuthal_quantum_number': None,
         'total_angular_momentum': None,
@@ -231,7 +245,8 @@ if __name__ == "__main__":
     #                                                                                                   "of the K-G "
     #                                                                                                   "equation")
     parser.add_argument("--optimization_method", choices=["BFGS", "trust-constr", "L-BFGS-B"], default="trust-constr")
-    parser.add_argument("--minimization_tol_lvl", type=float, default=1e-8,
+    parser.set_defaults(_minimization_tol_explicit=False)
+    parser.add_argument("--minimization_tol_lvl", type=float, default=1e-8, action=StoreExplicitTolerance,
                         help="Tolerance level for the optimization method. "
                              "The specific interpretation of this tolerance may vary "
                              "depending on the optimization method and problem characteristics. "
